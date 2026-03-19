@@ -10,8 +10,8 @@
 # Configuration Variables
 # ------------------------------------------------------------------------------
 # Change these values to match your target environment.
-PROJECT_ID="bnoriega-test-ge"
-APP_ID="gemini-enterprise-17670338_1767033834650"
+PROJECT_ID="your_project_id"
+APP_ID="your_app_id"
 LOCATION="global"
 
 # The string prefixed before the method name for datasets and sinks.
