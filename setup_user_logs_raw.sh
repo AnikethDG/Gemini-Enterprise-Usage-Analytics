@@ -84,7 +84,7 @@ GE_METHODS=(
 NLM_METHODS=(
   "CreateNotebook"
   "ShareNotebook"
-  "DeleteNotebook"
+  "BatchDeleteNotebooks"
   "GetNotebook"
   "InteractSources"
   "GenerateFreeFormStreamed"
