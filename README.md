@@ -39,6 +39,18 @@ This single execution handles making the REST API patches to enable Usage Audit 
 ./setup_user_logs_raw.sh
 ```
 
+### 3. Deploy Refined Views for Simplified Analysis
+
+To see a more refined, flattened view of the logs (which merges structures and safely handles varying payloads), you can deploy unified query views. 
+
+Edit the `setup_transformed_views.sh` script to verify your `PROJECT_ID`, `GE_TRANSFORMED_DATASET`, and `NLM_TRANSFORMED_DATASET` variables before running it.
+
+```bash
+./setup_transformed_views.sh
+```
+
+This handling creates the target transformation datasets and automatically reads the templatized `.sql` views for both Gemini Enterprise and NotebookLM, substituting configured project identifiers successfully.
+
 ## Usage
 
 After running the setup script, usage data will be automatically streamed to BigQuery. You can then query the data using standard SQL.
