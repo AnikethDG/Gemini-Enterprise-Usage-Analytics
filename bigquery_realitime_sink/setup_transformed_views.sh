@@ -8,7 +8,7 @@ set -e # Exit immediately on error
 # ------------------------------------------------------------------------------
 # 1. Configuration variables (Overridable via Env)
 # ------------------------------------------------------------------------------
-PROJECT_ID="${PROJECT_ID:-bnoriega-test-ge}"
+PROJECT_ID="${PROJECT_ID:-your-ge-project}"
 BQ_LOCATION="${BQ_LOCATION:-US}"
 
 GE_TRANSFORMED_DATASET="${GE_TRANSFORMED_DATASET:-ge_transformed}"
@@ -48,6 +48,15 @@ sed "s/\${PROJECT_ID}/${PROJECT_ID}/g" | \
 sed "s/\${GE_TRANSFORMED_DATASET}/${GE_TRANSFORMED_DATASET}/g" | \
 sed "s/\${GE_DATASET_PREFIX}/${GE_DATASET_PREFIX}/g" | \
 bq query --use_legacy_sql=false --project_id="${PROJECT_ID}"
+
+echo "----------------------------------------------------------------------"
+echo "[Caution] If you encounter a 'Not found: Table' error above, it means"
+echo "          your newly created sinks have not captured any real user logs"
+echo "          yet. BigQuery materializes sink tables on first insert."
+echo ""
+echo "          Generate a few active logs in your Gemini/NotebookLM engines,"
+echo "          then simply re-run this setup_transformed_views.sh script!"
+echo "----------------------------------------------------------------------"
 
 echo "[Success] GE View deployed."
 
