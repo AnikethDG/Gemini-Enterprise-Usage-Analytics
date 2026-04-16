@@ -1,41 +1,52 @@
 #!/bin/bash
 # ==============================================================================
 # Script: setup_user_logs_raw.sh
-# Description: Automates the creation of 20 isolated BigQuery datasets and
+# Description: Automates the creation of isolated BigQuery datasets and
 #              Cloud Logging sinks to natively track Gemini Enterprise and
-#              NotebookLM Enterprise usage metrics without schema collisions.
+#              NotebookLM Enterprise metrics cleanly.
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Configuration Variables
+# Configuration Variables (Overridable via Env)
 # ------------------------------------------------------------------------------
-# Change these values to match your target environment.
-PROJECT_ID="your_project_id"
-APP_ID="your_app_id"
-LOCATION="global"
+PROJECT_ID="${PROJECT_ID:-your_project_id}"
+# APP_ID can be a comma-separated list of apps (e.g., "app_1,app_2")
+APP_ID="${APP_ID:-your_app_id}"
+LOCATION="${LOCATION:-global}"
+BQ_LOCATION="${BQ_LOCATION:-US}"
 
-# The string prefixed before the method name for datasets and sinks.
-# E.g., if prefix is "ge_raw_logs_", dataset becomes "ge_raw_logs_search"
-DATASET_PREFIX="ge_raw_logs_"
-SINK_PREFIX="ge_raw_logs_"
+GE_DATASET_PREFIX="${GE_DATASET_PREFIX:-ge_raw_logs_}"
+GE_SINK_PREFIX="${GE_SINK_PREFIX:-ge_raw_logs_}"
+
+NLM_DATASET_PREFIX="${NLM_DATASET_PREFIX:-nlm_raw_logs_}"
+NLM_SINK_PREFIX="${NLM_SINK_PREFIX:-nlm_raw_logs_}"
 
 # ------------------------------------------------------------------------------
 # Pre-requisite: Enable Usage Audit Logging
 # ------------------------------------------------------------------------------
-echo "======================================================================"
-echo "Enabling Usage Audit Logging for Gemini Enterprise (App: ${APP_ID})..."
-echo "======================================================================"
+IFS=',' read -ra APP_ID_ARRAY <<< "$APP_ID"
+for SINGLE_APP_ID in "${APP_ID_ARRAY[@]}"; do
+    SINGLE_APP_ID=$(echo "$SINGLE_APP_ID" | xargs)
+    if [ -z "$SINGLE_APP_ID" ]; then
+        continue
+    fi
 
-curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" \
--H "Content-Type: application/json" \
--H "X-Goog-User-Project: ${PROJECT_ID}" \
-"https://${LOCATION}-discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_ID}/locations/${LOCATION}/collections/default_collection/engines/${APP_ID}?updateMask=observabilityConfig" \
--d '{
-  "observabilityConfig": {
-    "observabilityEnabled": true,
-    "sensitiveLoggingEnabled": true
-  }
-}'
+    echo "======================================================================"
+    echo "Enabling Usage Audit Logging for Gemini Enterprise (App: ${SINGLE_APP_ID})..."
+    echo "======================================================================"
+
+    curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    -H "Content-Type: application/json" \
+    -H "X-Goog-User-Project: ${PROJECT_ID}" \
+    "https://${LOCATION}-discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_ID}/locations/${LOCATION}/collections/default_collection/engines/${SINGLE_APP_ID}?updateMask=observabilityConfig" \
+    -d '{
+      "observabilityConfig": {
+        "observabilityEnabled": true,
+        "sensitiveLoggingEnabled": true
+      }
+    }'
+    echo ""
+done
 
 echo ""
 echo "======================================================================"
@@ -62,7 +73,6 @@ echo ""
 # ------------------------------------------------------------------------------
 # Method Definitions
 # ------------------------------------------------------------------------------
-# Gemini Enterprise Methods
 GE_METHODS=(
   "Search"
   "Assist"
@@ -80,7 +90,6 @@ GE_METHODS=(
   "UploadSessionFile"
 )
 
-# NotebookLM Enterprise Methods
 NLM_METHODS=(
   "CreateNotebook"
   "ShareNotebook"
@@ -90,58 +99,64 @@ NLM_METHODS=(
   "GenerateFreeFormStreamed"
 )
 
-# Combine all targeted tracked methods
-ALL_METHODS=("${GE_METHODS[@]}" "${NLM_METHODS[@]}")
-
-# ------------------------------------------------------------------------------
-# Execution Logic
-# ------------------------------------------------------------------------------
-echo "======================================================================"
-echo "Starting universal isolated logging deployment in project: ${PROJECT_ID}"
-echo "Dataset Prefix: ${DATASET_PREFIX}"
-echo "Sink Prefix: ${SINK_PREFIX}"
-echo "Total Methods to Deploy: ${#ALL_METHODS[@]}"
-echo "======================================================================"
-
-# Universal Cloud Logging base logName targeting Discovery Engine Usage Activity
 BASE_LOG_NAME="projects/${PROJECT_ID}/logs/discoveryengine.googleapis.com%2Fgemini_enterprise_user_activity"
 
-for METHOD in "${ALL_METHODS[@]}"; do
-    echo "--------------------------------------------------------"
-    echo "Deploying infrastructure for method: ${METHOD}..."
-    echo "--------------------------------------------------------"
+# ------------------------------------------------------------------------------
+# 1. Execution Logic: Gemini Enterprise Sinks
+# ------------------------------------------------------------------------------
+echo "======================================================================"
+echo "Deploying Gemini Enterprise sinks (Prefix: ${GE_DATASET_PREFIX})..."
+echo "======================================================================"
 
-    # Lowercase the method name for BigQuery dataset and Sink naming
+for METHOD in "${GE_METHODS[@]}"; do
+    echo "--------------------------------------------------------"
+    echo "Deploying GE isolation for method: ${METHOD}..."
+    
     LOWER_METHOD=$(echo "$METHOD" | tr '[:upper:]' '[:lower:]')
+    DATASET_NAME="${GE_DATASET_PREFIX}${LOWER_METHOD}"
+    SINK_NAME="${GE_SINK_PREFIX}${LOWER_METHOD}"
     
-    DATASET_NAME="${DATASET_PREFIX}${LOWER_METHOD}"
-    SINK_NAME="${SINK_PREFIX}${LOWER_METHOD}"
+    bq mk -f -d --location="${BQ_LOCATION}" "$DATASET_NAME" || true
     
-    # 1. Create the BigQuery Dataset
-    echo "-> Creating BigQuery dataset: ${DATASET_NAME}"
-    bq mk -f -d --location=US "$DATASET_NAME" || true
-    
-    # 2. Create the Cloud Logging Sink targeting the exact jsonPayload methodName
     FILTER="logName=\"${BASE_LOG_NAME}\" AND jsonPayload.logMetadata.methodName=\"${METHOD}\""
     
-    echo "-> Creating Cloud Logging sink: ${SINK_NAME}"
     SINK_PARAMS=$(gcloud logging sinks create "$SINK_NAME" "bigquery.googleapis.com/projects/${PROJECT_ID}/datasets/${DATASET_NAME}" \
-        --log-filter="${FILTER}" \
-        --use-partitioned-tables \
-        --format=json || gcloud logging sinks describe "$SINK_NAME" --format=json)
+        --log-filter="${FILTER}" --use-partitioned-tables --format=json 2>/dev/null || \
+        gcloud logging sinks update "$SINK_NAME" "bigquery.googleapis.com/projects/${PROJECT_ID}/datasets/${DATASET_NAME}" \
+        --log-filter="${FILTER}" --use-partitioned-tables --format=json)
         
-    # 3. Extract the Sink's native Service Account Identity
     WRITER_IDENTITY=$(echo "$SINK_PARAMS" | python3 -c "import sys, json; print(json.load(sys.stdin)['writerIdentity'])")
     
-    # 4. Bind the BigQuery Data Editor IAM Role to permit raw log insertion
-    echo "-> Binding IAM Role (roles/bigquery.dataEditor) to Service Account: ${WRITER_IDENTITY}"
-    gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-        --member="$WRITER_IDENTITY" \
-        --role="roles/bigquery.dataEditor" > /dev/null
-        
-    echo "[Success] Deployed ${METHOD}."
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="$WRITER_IDENTITY" --role="roles/bigquery.dataEditor" > /dev/null
 done
 
+# ------------------------------------------------------------------------------
+# 2. Execution Logic: NotebookLM Enterprise Sinks
+# ------------------------------------------------------------------------------
 echo "======================================================================"
-echo "Deployment Complete! All 20 isolation pipelines are active."
+echo "Deploying NotebookLM sinks (Prefix: ${NLM_DATASET_PREFIX})..."
 echo "======================================================================"
+
+for METHOD in "${NLM_METHODS[@]}"; do
+    echo "--------------------------------------------------------"
+    echo "Deploying NotebookLM isolation for method: ${METHOD}..."
+    
+    LOWER_METHOD=$(echo "$METHOD" | tr '[:upper:]' '[:lower:]')
+    DATASET_NAME="${NLM_DATASET_PREFIX}${LOWER_METHOD}"
+    SINK_NAME="${NLM_SINK_PREFIX}${LOWER_METHOD}"
+    
+    bq mk -f -d --location="${BQ_LOCATION}" "$DATASET_NAME" || true
+    
+    FILTER="logName=\"${BASE_LOG_NAME}\" AND jsonPayload.logMetadata.methodName=\"${METHOD}\""
+    
+    SINK_PARAMS=$(gcloud logging sinks create "$SINK_NAME" "bigquery.googleapis.com/projects/${PROJECT_ID}/datasets/${DATASET_NAME}" \
+        --log-filter="${FILTER}" --use-partitioned-tables --format=json 2>/dev/null || \
+        gcloud logging sinks update "$SINK_NAME" "bigquery.googleapis.com/projects/${PROJECT_ID}/datasets/${DATASET_NAME}" \
+        --log-filter="${FILTER}" --use-partitioned-tables --format=json)
+        
+    WRITER_IDENTITY=$(echo "$SINK_PARAMS" | python3 -c "import sys, json; print(json.load(sys.stdin)['writerIdentity'])")
+    
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="$WRITER_IDENTITY" --role="roles/bigquery.dataEditor" > /dev/null
+done
+
+echo "[Success] Both GE and NLM cleanly deployed!"
