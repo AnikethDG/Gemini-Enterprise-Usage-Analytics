@@ -25,29 +25,34 @@ For more information, see the official documentation:
 
 ## Setup
 
-### 1. Configuration
+### Option A: Interactive Wizard (Recommended)
 
-The single entrypoint script `setup_user_logs_raw.sh` handles both the API-level observability enablement and the infrastructure provisioning automatically.
-
-Edit the `setup_user_logs_raw.sh` script to set your specific `PROJECT_ID`, `APP_ID`, and `LOCATION` variables before running it.
-
-### 2. Run the Setup Script
-
-This single execution handles making the REST API patches to enable Usage Audit Logging, creates all necessary BigQuery datasets, spins up matching Cloud Logging sinks, and applies the required IAM permissions automatically.
+We provide a convenient interactive runner that prompts you for all critical parameters (including multiple comma-separated APP_IDs) and sequentially handles the deployment:
 
 ```bash
-./setup_user_logs_raw.sh
+./interactive_runner.sh
 ```
+This will automatically execute both the raw pipeline creation and the transformed BigQuery view installations.
 
-### 3. Deploy Refined Views for Simplified Analysis
+### Option B: Manual Configuration via Environment Variables
 
-To see a more refined, flattened view of the logs (which merges structures and safely handles varying payloads), you can deploy unified query views. 
+If you prefer executing the shell scripts directly or in a CI/CD context, you can pass configuration via environment variables.
 
-Edit the `setup_transformed_views.sh` script to verify your `PROJECT_ID`, `GE_TRANSFORMED_DATASET`, and `NLM_TRANSFORMED_DATASET` variables before running it.
+1. **Set up API logging and raw sinks:**
+   Edit or export variables directly. Note that `APP_ID` natively accepts a comma-separated list for provisioning multiple apps simultaneously.
+   ```bash
+   export PROJECT_ID="your_project_id"
+   export APP_ID="your_app_id_1,your_app_id_2"
+   export LOCATION="global"
+   
+   ./setup_user_logs_raw.sh
+   ```
 
-```bash
-./setup_transformed_views.sh
-```
+2. **Install refined unified views:**
+   Run the SQL script consolidators to deploy views for simplified tabular reporting.
+   ```bash
+   ./setup_transformed_views.sh
+   ```
 
 This handling creates the target transformation datasets and automatically reads the templatized `.sql` views for both Gemini Enterprise and NotebookLM, substituting configured project identifiers successfully.
 
