@@ -21,54 +21,7 @@ GE_SINK_PREFIX="${GE_SINK_PREFIX:-ge_raw_logs_}"
 NLM_DATASET_PREFIX="${NLM_DATASET_PREFIX:-nlm_raw_logs_}"
 NLM_SINK_PREFIX="${NLM_SINK_PREFIX:-nlm_raw_logs_}"
 
-# ------------------------------------------------------------------------------
-# Pre-requisite: Enable Usage Audit Logging
-# ------------------------------------------------------------------------------
-IFS=',' read -ra APP_ID_ARRAY <<< "$APP_ID"
-for SINGLE_APP_ID in "${APP_ID_ARRAY[@]}"; do
-    SINGLE_APP_ID=$(echo "$SINGLE_APP_ID" | xargs)
-    if [ -z "$SINGLE_APP_ID" ]; then
-        continue
-    fi
-
-    echo "======================================================================"
-    echo "Enabling Usage Audit Logging for Gemini Enterprise (App: ${SINGLE_APP_ID})..."
-    echo "======================================================================"
-
-    curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type: application/json" \
-    -H "X-Goog-User-Project: ${PROJECT_ID}" \
-    "https://${LOCATION}-discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_ID}/locations/${LOCATION}/collections/default_collection/engines/${SINGLE_APP_ID}?updateMask=observabilityConfig" \
-    -d '{
-      "observabilityConfig": {
-        "observabilityEnabled": true,
-        "sensitiveLoggingEnabled": true
-      }
-    }'
-    echo ""
-done
-
-echo ""
-echo "======================================================================"
-echo "Enabling Usage Audit Logging for NotebookLM Enterprise (Project: ${PROJECT_ID})..."
-echo "======================================================================"
-
-curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" \
--H "Content-Type: application/json" \
--H "X-Goog-User-Project: ${PROJECT_ID}" \
-"https://${LOCATION}-discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_ID}?updateMask=customerProvidedConfig.notebooklmConfig.observabilityConfig" \
--d '{
-  "customerProvidedConfig": {
-    "notebooklmConfig": {
-      "observabilityConfig": {
-        "observabilityEnabled": true,
-        "sensitiveLoggingEnabled": true
-      }
-    }
-  }
-}'
-
-echo ""
+# [Note] Usage Audit Logging must be enabled using ../enable_audit_logging.sh
 
 # ------------------------------------------------------------------------------
 # Method Definitions

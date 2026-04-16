@@ -34,6 +34,62 @@ We provide a convenient interactive runner that prompts you for all critical par
 ```
 This will automatically execute both the raw pipeline creation and the transformed BigQuery view installations.
 
+#### Sample Deployment Output
+
+```text
+🌟 Gemini & NotebookLM Analytics Pipeline Wizard
+======================================================================
+Enter Target Google Cloud PROJECT_ID: ge-test-12345
+Enter Gemini APP_ID(s) (comma-separated for multiple, e.g., app_1,app_2): gemini-enterprise-12345_123456789
+Enter BigQuery Storage Location (e.g., US): US
+Enter Gemini Raw Dataset Prefix (default: ge_raw_logs_): 
+Enter NotebookLM Raw Dataset Prefix (default: nlm_raw_logs_): 
+
+... [Architecture Preview Displayed] ...
+
+Are you perfectly happy with these dataset names? (y/N): y
+
+🚀 Deploying infrastructure sequentially...
+
+[Step 1] Deploying Raw Isolated Pipelines...
+======================================================================
+Enabling Usage Audit Logging for Gemini Enterprise (App: gemini-enterprise-12345_123456789)...
+======================================================================
+...
+
+======================================================================
+Deploying Gemini Enterprise sinks (Prefix: ge_raw_logs_)...
+======================================================================
+--------------------------------------------------------
+Deploying GE isolation for method: Search...
+Dataset 'ge-test-12345:ge_raw_logs_search' successfully created.
+Updated IAM policy for project [ge-test-12345].
+...
+
+[Step 2] Deploying Transformed Flattened Views...
+======================================================================
+Starting deployment of transformed views in project: ge-test-12345
+GE Transformed Dataset: ge_transformed
+NLM Transformed Dataset: nlm_transformed
+======================================================================
+-> Verifying Destination Datasets...
+Dataset 'ge-test-12345:ge_transformed' successfully created.
+Dataset 'ge-test-12345:nlm_transformed' successfully created.
+-> Deploying Gemini Enterprise (GE) Logs View...
+Waiting on bqjob_...
+[Success] GE View deployed.
+-> Deploying NotebookLM (NLM) Logs View...
+Waiting on bqjob_...
+[Success] NLM View deployed.
+======================================================================
+Deployment Complete!
+======================================================================
+
+Creating summary.txt...
+✨ Success! Saved overview in summary.txt.
+```
+
+
 ### Option B: Manual Configuration via Environment Variables
 
 If you prefer executing the shell scripts directly or in a CI/CD context, you can pass configuration via environment variables.

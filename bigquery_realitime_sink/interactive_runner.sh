@@ -53,8 +53,12 @@ echo ""
 echo "🚀 Deploying infrastructure sequentially..."
 echo ""
 
-chmod +x setup_user_logs_raw.sh setup_transformed_views.sh
+chmod +x setup_user_logs_raw.sh setup_transformed_views.sh ../enable_audit_logging.sh
 
+echo "[Step 0] Enabling Global Usage Audit Logging..."
+../enable_audit_logging.sh
+
+echo ""
 echo "[Step 1] Deploying Raw Isolated Pipelines..."
 ./setup_user_logs_raw.sh
 

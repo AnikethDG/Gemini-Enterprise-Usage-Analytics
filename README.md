@@ -4,6 +4,11 @@ This repository hosts scalable patterns for extracting observability, user behav
 
 We maintain **two parallel architectural paradigms** for consuming these logs. 
 
+## Security and Prerequisites
+
+For details on setting up fundamental audit logs, requisite IAM roles, and internal security measures, follow the official setup guide:
+- **[Gemini Enterprise: Set up usage audit logs](https://docs.cloud.google.com/gemini/enterprise/docs/set-up-usage-audit-logs)**
+
 ---
 
 ## 1. [Real-Time BigQuery Sink](./bigquery_realitime_sink/README.md)
