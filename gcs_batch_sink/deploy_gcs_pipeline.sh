@@ -24,7 +24,25 @@ echo "======================================================================"
 # 1. Create BigQuery Dataset
 bq mk -f -d --location="${BQ_LOCATION}" "${PROJECT_ID}:${GCS_DATASET}" || true
 
-# 2. Deploy SQL External Table and Views
+# 2. Create Cloud Logging Sink to GCS
+echo "-> Deploying Cloud Logging Sink to GCS..."
+GCS_TEMP="${GCS_URI#gs://}"
+GCS_BUCKET_NAME="${GCS_TEMP%%/*}"
+SINK_NAME="ge_gcs_batch_sink"
+FILTER="logName=\"projects/${PROJECT_ID}/logs/discoveryengine.googleapis.com%2Fgemini_enterprise_user_activity\""
+
+SINK_PARAMS=$(gcloud logging sinks create "$SINK_NAME" "storage.googleapis.com/${GCS_BUCKET_NAME}" \
+    --log-filter="${FILTER}" --format=json 2>/dev/null || \
+    gcloud logging sinks update "$SINK_NAME" "storage.googleapis.com/${GCS_BUCKET_NAME}" \
+    --log-filter="${FILTER}" --format=json)
+
+WRITER_IDENTITY=$(echo "$SINK_PARAMS" | python3 -c "import sys, json; print(json.load(sys.stdin)['writerIdentity'])")
+
+echo "-> Granting storage write permissions to sink identity..."
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="$WRITER_IDENTITY" --role="roles/storage.objectCreator" > /dev/null
+
+# 3. Deploy SQL External Table and Views
+echo "-> Deploying SQL External Table and Views..."
 cat "$SQL_FILE" | \
 sed "s/\${PROJECT_ID}/${PROJECT_ID}/g" | \
 sed "s/\${GCS_DATASET}/${GCS_DATASET}/g" | \
