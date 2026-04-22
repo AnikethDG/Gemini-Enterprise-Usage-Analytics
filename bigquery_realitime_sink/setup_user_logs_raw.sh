@@ -41,6 +41,7 @@ GE_METHODS=(
   "UpdateDataConnector"
   "AddContextFile"
   "UploadSessionFile"
+  "WriteUserEvent"
 )
 
 NLM_METHODS=(
