@@ -31,10 +31,15 @@ GCS_BUCKET_NAME="${GCS_TEMP%%/*}"
 SINK_NAME="ge_gcs_batch_sink"
 FILTER="logName=\"projects/${PROJECT_ID}/logs/discoveryengine.googleapis.com%2Fgemini_enterprise_user_activity\""
 
-SINK_PARAMS=$(gcloud logging sinks create "$SINK_NAME" "storage.googleapis.com/${GCS_BUCKET_NAME}" \
-    --log-filter="${FILTER}" --format=json 2>/dev/null || \
-    gcloud logging sinks update "$SINK_NAME" "storage.googleapis.com/${GCS_BUCKET_NAME}" \
-    --log-filter="${FILTER}" --format=json)
+if gcloud logging sinks describe "$SINK_NAME" --project="${PROJECT_ID}" >/dev/null 2>&1; then
+    echo "-> Sink exists, updating..."
+    SINK_PARAMS=$(gcloud logging sinks update "$SINK_NAME" "storage.googleapis.com/${GCS_BUCKET_NAME}" \
+        --log-filter="${FILTER}" --project="${PROJECT_ID}" --format=json)
+else
+    echo "-> Sink does not exist, creating..."
+    SINK_PARAMS=$(gcloud logging sinks create "$SINK_NAME" "storage.googleapis.com/${GCS_BUCKET_NAME}" \
+        --log-filter="${FILTER}" --project="${PROJECT_ID}" --format=json)
+fi
 
 WRITER_IDENTITY=$(echo "$SINK_PARAMS" | python3 -c "import sys, json; print(json.load(sys.stdin)['writerIdentity'])")
 
